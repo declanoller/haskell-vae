@@ -18,7 +18,7 @@ build-type:          Simple
 extra-source-files:  CHANGELOG.md
 
 executable haskell-vae
-  main-is:             vae_1.hs
+  main-is:             vae.hs
   other-modules:       MatNNGradTypes, Utils, MatrixUtils, NNUtils, GradUtils, TrainUtils
   -- other-extensions:
   build-depends:       base >=4.9 && <4.10, random-fu, hmatrix, split, deepseq, random, array, time, directory
