@@ -1,0 +1,10 @@
+*__pycache__*
+dist-newstyle*
+data/*
+output/*
+output_pics/*
+misc
+misc/*
+saved_vaes
+saved_vaes/*
+*.aux
