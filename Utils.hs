@@ -21,35 +21,16 @@ import Control.Monad
 import Data.Random
 import System.Random
 
-
 import Numeric.LinearAlgebra
 import Data.Typeable
 import Control.DeepSeq
 
-import System.IO.Unsafe
 import System.IO
-
 
 import MatNNGradTypes
 
 
-------------------------- Getting batches of data from file
-
-shuffle_list :: [a] -> IO [a]
-shuffle_list xs = do
-        ar <- newArray n xs
-        forM [1..n] $ \i -> do
-            j <- randomRIO (i,n)
-            vi <- readArray ar i
-            vj <- readArray ar j
-            writeArray ar j vi
-            return vj
-  where
-    n = length xs
-    newArray :: Int -> [a] -> IO (IOArray Int a)
-    newArray n xs =  newListArray (1,n) xs
-
-
+-- Get the contents of a single data file from an integer index
 get_contents_from_fname_ind :: String -> Int -> IO [Double]
 get_contents_from_fname_ind data_dir fname_ind = do
 
@@ -65,7 +46,7 @@ get_contents_from_fname_ind data_dir fname_ind = do
   let data_list = extractXs line
   return data_list
 
-
+-- Same as get_contents_from_fname_ind but also get the label (assumed to be the first digit)
 get_contents_from_fname_ind_with_labels :: String -> Int -> IO ([Double], Int)
 get_contents_from_fname_ind_with_labels data_dir fname_ind = do
 
@@ -84,13 +65,14 @@ get_contents_from_fname_ind_with_labels data_dir fname_ind = do
   return (data_list, label)
 
 
+-- Get a random batch from the data dir
 get_random_batch :: String -> Int -> Int -> IO [[Double]]
 get_random_batch data_dir batch_size n_tot_samples = do
   rand_list <- mapM (\x -> randomRIO (0, n_tot_samples-1)) [1..batch_size]
   rand_batch <- mapM (get_contents_from_fname_ind data_dir) rand_list
   return rand_batch
 
-
+-- Same as get_random_batch but with labels
 get_random_batch_with_labels :: String -> Int -> Int -> IO ([[Double]], [Int])
 get_random_batch_with_labels data_dir batch_size n_tot_samples = do
   rand_list <- mapM (\x -> randomRIO (0, n_tot_samples-1)) [1..batch_size]
@@ -98,7 +80,7 @@ get_random_batch_with_labels data_dir batch_size n_tot_samples = do
   let (rand_batch, labels) = unzip rand_batch_label_list
   return (rand_batch, labels)
 
-
+-- Generic file read function. Uses hGetLine to avoid lazy reading like readFile
 get_contents_from_fname :: String -> IO [Double]
 get_contents_from_fname fname = do
   let toDouble x = read x / 256
@@ -111,7 +93,7 @@ get_contents_from_fname fname = do
   let data_list = extractXs line
   return data_list
 
-
+-- Same as get_contents_from_fname, but formats it into a Matrix R
 get_contents_as_mat_from_fname :: String -> IO (Matrix R)
 get_contents_as_mat_from_fname fname = do
   dat <- get_contents_from_fname fname
@@ -213,6 +195,8 @@ load_nn_from_file fname_base = do
   return nn
 
 
+-- Scheme to choose method for determining beta_KL based on current epoch and
+-- number of total epochs.
 get_beta_KL :: Int -> Int -> Double -> Double
 get_beta_KL cur_epoch n_epochs beta_KL_max = beta_KL
   where beta_KL = beta_KL_max -- const version
@@ -223,28 +207,10 @@ get_beta_KL cur_epoch n_epochs beta_KL_max = beta_KL
   -}
 
 
-
-
 ------------------------------ Misc
-
-
 
 roundToStr :: (PrintfArg a, Floating a) => Int -> a -> String
 roundToStr = printf "%0.*f"
-
-
-print_grads :: (Grads, Grads) -> IO ()
-print_grads (g_1, g_2) = do
-  putStrLn "\nGrads:"
-  let (GradMatList wlist_1) = g_1
-      sizes = map size wlist_1
-  print sizes
-
-  let (GradMatList wlist_2) = g_2
-      sizes = map size wlist_2
-  print sizes
-  return ()
-
 
 
 

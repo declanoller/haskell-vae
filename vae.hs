@@ -1,8 +1,5 @@
-
 import Numeric.LinearAlgebra
-import Data.List.Split
 import System.Random
-import Data.Typeable
 
 import MatNNGradTypes
 import Utils
@@ -12,7 +9,6 @@ import GradUtils
 import TrainUtils
 
 import System.Directory
---import GHC.Stats
 
 -- normally MNIST has 1875 batches of 32 per epoch. Here, we do
 -- ~20 epochs of 100 batches of 32.
@@ -34,13 +30,13 @@ main = do
       data_info_mnist = DataInfo  { n_input = 784
                                   , n_tot_samples = 60000
                                   , prefix = "mnist"
-                                  , data_dir = "mnist_data/"
+                                  , data_dir = "data/mnist_data/"
                                   }
 
       data_info_dogpeople = DataInfo  { n_input = 2500
                                       , n_tot_samples = 7000
                                       , prefix = "dogpeople"
-                                      , data_dir = "dogpeople_data/"
+                                      , data_dir = "data/dogpeople_data/"
                                       }
 
       --data_info = data_info_mnist

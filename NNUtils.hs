@@ -21,7 +21,7 @@ import Numeric.LinearAlgebra
 import MatNNGradTypes
 import MatrixUtils
 
-
+-- Returns both linear and nonlinear outputs, which are both needed at various points.
 forward_unit :: (Batch, Layer) -> (Batch, Batch)
 forward_unit (Batch x, Layer w) = (Batch y, Batch a)
   where y = (x ||| 1) <> w
@@ -34,6 +34,7 @@ forward x (WeightMatList w_list) = scanl fold_fn (x, x) w_list
 
 
 -- Assumes the VAE layer outputs a list of [mu_i, sigma_i].
+-- Adds a small 10**(-6) to prevent it from going too low (common tactic).
 forward_vae_unit :: Batch -> IO (Batch, Batch, Matrix R, Matrix R)
 forward_vae_unit (Batch g) = do
   let (batch_size, n_g) = size g
@@ -62,14 +63,12 @@ kl_div_bw :: Matrix R -> Matrix R -> Double -> Matrix R
 kl_div_bw mu sigma beta_KL = scale (-beta_KL) kl_bw
   where kl_bw = (-mu) ||| ((1/sigma - sigma)*(softplus_bw (softplus_inv (sigma - 10**(-6.0)))))
 
-
+-- Forward pass of the VAE.
 forward_vae :: Batch -> VAE -> IO ([(Batch, Batch)], Batch, Batch, Matrix R, Matrix R, [(Batch, Batch)], Batch, Batch)
 forward_vae x (VAE (nn_front, nn_back)) = do
 
-
   let outputs_front = forward x nn_front
       y_out_front = fst $ last outputs_front -- using fst so it takes y rather than a
-
 
   (input_back, gauss_sample, mu, sigma) <- forward_vae_unit y_out_front
 
@@ -80,6 +79,8 @@ forward_vae x (VAE (nn_front, nn_back)) = do
 
   return out_tup
 
+-- Does a forward pass, but doesn't sample: just uses z = mu, to avoid adding
+-- noise when we just want to see the best reconstructions possible.
 forward_vae_no_sample :: Batch -> VAE -> ([(Batch, Batch)], Batch, Batch, Matrix R, Matrix R, [(Batch, Batch)], Batch, Batch)
 forward_vae_no_sample x (VAE (nn_front, nn_back)) = output_tuple
 
@@ -104,12 +105,9 @@ forward_vae_no_sample_recon :: VAE -> Batch -> Batch
 forward_vae_no_sample_recon vae x = y_sig
   where (_, _, _, _, _, _, y_out, y_sig) = forward_vae_no_sample x vae
 
-
-
 forward_vae_from_latent_space :: VAE -> Batch -> Batch
 forward_vae_from_latent_space (VAE (nn_front, nn_back)) x = sigmoid_batch $ fst $ last ys_as
   where ys_as = forward x nn_back
-
 
 forward_vae_to_latent_space :: VAE -> Batch -> Batch
 forward_vae_to_latent_space (VAE (nn_front, nn_back)) x = input_back
@@ -135,41 +133,20 @@ backward_vae ((Batch x), y_target) (VAE (front_half, back_half)) (outputs_front,
         dy_sig_dy_back = sigmoid_bw y_back_mat
         Batch dLdy_sig = mse_loss_bw y_target y_sig
         dLdy = dLdy_sig*dy_sig_dy_back
-        {-
-        -}
-
-        --previous, without sigmoid:
-        --Batch dLdy = mse_loss_bw y_target y_out
 
         WeightMatList w_front = front_half
         WeightMatList w_back = back_half
 
-        -- Below, commented ones are previous, without bias.
-
-        --first_back_w = tr $ layer_to_matrix $ head w_back
         first_back_w = tr $ drop_last_row $ layer_to_matrix $ head w_back
         new_first_back_w = repmat first_back_w 1 2
 
-        --dydw_all = (map tr $ init $ batchlist_to_matlist a_front) ++ (map tr $ init $ batchlist_to_matlist a_back) -- no bias
-        --dydw_all = (map tr $ map (\x -> x|||1) $ init $ batchlist_to_matlist a_front) ++ (map tr $ map (\x -> x|||1) $ init $ batchlist_to_matlist a_back) -- first bias one
         dydw_front = map (tr . right_pad_ones . batch_to_mat) (init a_front)
         dydw_all = map (tr . right_pad_ones . batch_to_mat) $ (init a_front) ++ (init a_back)
-
-        -- no bias:
-        --dyda_all = (tail $ map tr $ map layer_to_matrix w_front) ++ [new_first_back_w] ++ (tail $ map tr $ map layer_to_matrix w_back) -- no bias
-        --dyda_all = (tail $ map tr $ map drop_last_row $ map layer_to_matrix w_front) ++ [new_first_back_w] ++ (tail $ map tr $ map drop_last_row $ map layer_to_matrix w_back) --first bias one
-
-        -- with bias, before KL fix:
-        --dyda_all = (map (tr . drop_last_row . layer_to_matrix) $ tail w_front) ++ [new_first_back_w] ++ (map (tr . drop_last_row . layer_to_matrix) $ tail w_back)
 
         dyda_front = (map (tr . drop_last_row . layer_to_matrix) $ tail w_front)
         dyda_all = dyda_front ++ [new_first_back_w] ++ (map (tr . drop_last_row . layer_to_matrix) $ tail w_back)
 
         gauss_sample_bridge = bw_vae_unit gauss_sample sigma
-
-
-        -- with bias, before KL fix:
-        -- dady_all = (map (nonlinear_fn_bw . batch_to_mat) $ tail $ init y_front) ++ [gauss_sample_bridge] ++ (map (nonlinear_fn_bw . batch_to_mat) $ tail $ init y_back)
 
         dady_front = (map (nonlinear_fn_bw . batch_to_mat) $ tail $ init y_front)
         dady_all = dady_front ++ [gauss_sample_bridge] ++ (map (nonlinear_fn_bw . batch_to_mat) $ tail $ init y_back)
@@ -179,17 +156,12 @@ backward_vae ((Batch x), y_target) (VAE (front_half, back_half)) (outputs_front,
         grad_products = scanr (\(dyda, dady) prev -> (prev<>dyda)*dady) dLdy dyda_dady_tups
         all_grads = zipWith ( <> ) dydw_all grad_products
 
-
-        --kl_bridge = kl_div_bw mu sigma beta_KL
         dKL_dg = kl_div_bw mu sigma beta_KL
 
         -- This should have the length of only the grads_front
         dyda_dady_tups_kl = zip dyda_front dady_front
         kl_grad_products = scanr (\(dyda, dady) prev -> (prev<>dyda)*dady) dKL_dg dyda_dady_tups_kl
         kl_grads = zipWith ( <> ) dydw_front kl_grad_products
-
-        -- with bias, before KL fix:
-        --(grads_front, grads_back) = splitAt (length front_weights) all_grads
 
         (recon_grads_front, grads_back) = splitAt (length front_weights) all_grads
         grads_front = zipWith (+) recon_grads_front kl_grads
@@ -226,16 +198,13 @@ build_nn weight_dims = do
   let weight_and_bias_dims = map (+ 1) weight_dims
       input_output_size_tups = zip (init weight_and_bias_dims) (tail weight_dims)
       uniform_bds = map (\x -> (fromIntegral x)**(-0.5)) (init weight_and_bias_dims) -- 1/sqrt(fan_in)
-      --weight_stds = map (\x -> 0.5*(fromIntegral x)**(-0.5)) (init weight_and_bias_dims)
-  --print weight_stds
-  --all_weight_mats <- mapM (\(n_in, n_out) -> (randn n_in n_out)) input_output_size_tups
+
   all_weight_mats <- mapM (\(n_in, n_out) -> (rand n_in n_out)) input_output_size_tups
   putStrLn "\nNN layer sizes:"
   print input_output_size_tups
-  --let all_weights_scaled = zipWith (*) weight_stds all_weight_mats
-  let all_weights_scaled = zipWith (\unif_bds w -> 2*unif_bds*w - unif_bds) uniform_bds all_weight_mats
 
-  let all_layers = map Layer all_weights_scaled
+  let all_weights_scaled = zipWith (\unif_bds w -> 2*unif_bds*w - unif_bds) uniform_bds all_weight_mats
+      all_layers = map Layer all_weights_scaled
   return (WeightMatList all_layers)
 
 {-

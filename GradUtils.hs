@@ -28,6 +28,8 @@ get_init_grads_vae (VAE (front_half, back_half)) = (front_half_zeroed, back_half
         back_half_zeroed = get_init_grads back_half
 
 
+-- Set up initial Adam optimizer. Uses a passed VAE to determine the sizes of the
+-- matrices. Params used are same as PyTorch.
 get_init_adam_optim :: VAE -> Double -> VAEAdamOptim
 get_init_adam_optim (VAE (front_half, back_half)) alpha = VAEAdamOptimParams (front_half_nn_optim, back_half_nn_optim, alpha)
   where GradMatList front_half_zeroed = get_init_grads front_half
@@ -55,6 +57,15 @@ grads_momentum (last_vel_front, last_vel_back) (cur_grads_front, cur_grads_back)
         momentum = 0.9
 
 
+{-
+Steps the Adam optimizer. Note: the epsilon term, 10**(-6), is typically
+smaller, 10**(-8), but I found that that was numerically unstable (a known
+issue with Adam). I found that decreasing it to 10**(-6) prevented that, without
+a noticeable drop in performance. However, since it's typically 10**(-8),
+in other implementations, it's possible something is wrong somewhere. Also note:
+it's much slower to multiply by an elementwise inverted matrix than to divide by
+one.
+-}
 step_adam_optim :: AdamOptim -> Matrix R -> (AdamOptim, Matrix R)
 step_adam_optim adam_optim g = (new_adam_optim, adam_grads)
   where AdamOptimParams (m, v, t, beta_1, beta_2) = adam_optim
@@ -73,7 +84,8 @@ step_nn_adam_optim nn_adam_optim cur_grads = (NNAdamOptimParams new_layer_adam_o
         (new_layer_adam_optims, new_layer_grads) = unzip $ zipWith step_adam_optim layer_adam_optims layer_grads
 
 
-
+-- Unpack and step the Adam optimizer. Essentially steps each of the NNs, and each
+-- of their layers, separately.
 step_vae_adam_optim :: VAEAdamOptim -> (Grads, Grads) -> (VAEAdamOptim, (Grads, Grads))
 step_vae_adam_optim vae_adam_optim (cur_grads_front, cur_grads_back) = (new_vae_adam_optim, new_grads_tup)
   where VAEAdamOptimParams (front_adam_optim, back_adam_optim, alpha) = vae_adam_optim

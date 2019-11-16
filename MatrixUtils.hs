@@ -22,7 +22,6 @@ module MatrixUtils
 ) where
 
 
-
 import Numeric.LinearAlgebra
 import MatNNGradTypes
 
@@ -41,10 +40,13 @@ batchlist_to_matlist batches = map (\(Batch x) -> x) batches
 
 ------------ Matrix functions
 
+-- Generic nonlinear function, so if you want to switch out which function to
+-- use, all other places call this one, so you just need to switch here.
 nonlinear_fn :: Matrix R -> Matrix R
 --nonlinear_fn m = mat_relu m
 nonlinear_fn m = tanh m
 
+-- corresponding backwards fn.
 nonlinear_fn_bw :: Matrix R -> Matrix R
 --nonlinear_fn_bw m = mat_relu_bw m
 nonlinear_fn_bw m = 1 - (tanh m)**2
@@ -132,7 +134,8 @@ get_latent_path pt1 pt2 = Batch latent_path
 
         latent_path = pt1 + m*step_mat
 
-
+-- Supply a Matrix R of a point in the latent space, as well as the "radius"
+-- around it to get latent points from.
 get_grid_around_latent_pt :: Matrix R -> Double -> Batch
 get_grid_around_latent_pt pt rad = Batch grid
   where latent_dim = snd $ size pt

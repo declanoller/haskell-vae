@@ -20,7 +20,8 @@ import GradUtils
 
 
 
-
+-- Train for a single batch. Does a forward pass with forward_vae, backward
+-- pass with backward_vae, steps weights with step_vae_adam_optim and step_weights_vae.
 train_batch_vae :: VAE -> VAEAdamOptim -> TrainInfo -> DataInfo -> Int -> TrainStats -> Double -> IO (VAE, VAEAdamOptim, TrainStats)
 train_batch_vae vae vae_optim train_info data_info iter train_stats cur_beta_KL = do
 
@@ -49,7 +50,7 @@ train_batch_vae vae vae_optim train_info data_info iter train_stats cur_beta_KL 
   return (new_vae, new_vae_optim, new_train_stats)
 
 
-
+-- Train for a single epoch. Uses foldM over train_batch_vae.
 train_epoch_vae :: VAE -> VAEAdamOptim -> TrainInfo -> DataInfo -> TrainStats -> Int -> IO (VAE, VAEAdamOptim, TrainStats)
 train_epoch_vae vae vae_optim train_info data_info train_stats epoch = do
 
@@ -73,7 +74,7 @@ train_epoch_vae vae vae_optim train_info data_info train_stats epoch = do
   putStrLn ("\tEpoch kl loss = " ++ roundToStr 4 ((sum (losses_kl epoch_train_stats))/(fromIntegral n_batches)))
   putStrLn $ "\tEpoch train time = " ++ (show $ diffUTCTime stop_epoch start_epoch)
 
-
+  -- Periodically save a backup of the current VAE.
   let tot_epochs = n_epochs train_info
   if rem epoch (max 1 (div tot_epochs 20)) == 0
     then do
@@ -95,7 +96,9 @@ train_epoch_vae vae vae_optim train_info data_info train_stats epoch = do
   return (new_vae, new_vae_optim, new_train_stats)
 
 
-
+-- Train for n_epochs. Uses foldM over train_epoch_vae.
+-- Note: very important to use (force cur_vae) (force cur_optim) to prevent
+-- a large thunk from building up.
 train_n_epochs :: VAE -> VAEAdamOptim -> TrainInfo -> DataInfo -> IO (VAE, VAEAdamOptim, TrainStats)
 train_n_epochs vae vae_optim train_info data_info = do
 
