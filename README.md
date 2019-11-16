@@ -87,7 +87,7 @@ It works very well with MNIST, using a hidden layer of 1,000 and a latent space 
 No KL div loss:
 
 <p align="center">
-  <img width="1000" height="166" src="resources/recon_default_0KL.png">
+  <img width="500" height="84" src="resources/recon_default_0KL.png">
 </p>
 
 
@@ -101,7 +101,7 @@ No KL div loss:
 
 
 <p align="center">
-  <img width="1000" height="166" src="resources/recon_default_nonzeroKL.png">
+  <img width="500" height="84" src="resources/recon_default_nonzeroKL.png">
 </p>
 
 
