@@ -14,7 +14,6 @@ import MatNNGradTypes
 import MatrixUtils
 
 
-
 get_init_grads :: NN -> Grads
 get_init_grads (WeightMatList nn) = grads_zeroed
   where mat_list = map (\(Layer x) -> x) nn
@@ -93,7 +92,3 @@ step_vae_adam_optim vae_adam_optim (cur_grads_front, cur_grads_back) = (new_vae_
         (new_nn_back_optim, new_grads_back) = step_nn_adam_optim back_adam_optim cur_grads_back
         new_vae_adam_optim = VAEAdamOptimParams (new_nn_front_optim, new_nn_back_optim, alpha)
         new_grads_tup = (new_grads_front, new_grads_back)
-
-
-{-
--}

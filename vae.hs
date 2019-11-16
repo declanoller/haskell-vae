@@ -79,6 +79,4 @@ main = do
   save_vae_to_file new_vae vae_fname
   print "\nDone!\n"
 
-
-
   return ()

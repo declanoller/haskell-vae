@@ -19,7 +19,6 @@ import NNUtils
 import GradUtils
 
 
-
 -- Train for a single batch. Does a forward pass with forward_vae, backward
 -- pass with backward_vae, steps weights with step_vae_adam_optim and step_weights_vae.
 train_batch_vae :: VAE -> VAEAdamOptim -> TrainInfo -> DataInfo -> Int -> TrainStats -> Double -> IO (VAE, VAEAdamOptim, TrainStats)
