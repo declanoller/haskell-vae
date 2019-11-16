@@ -167,6 +167,7 @@ backward_vae ((Batch x), y_target) (VAE (front_half, back_half)) (outputs_front,
         grads_front = zipWith (+) recon_grads_front kl_grads
 
 
+
 step_weights :: NN -> Grads -> Double -> NN
 step_weights (WeightMatList w_list) (GradMatList grad_list) alpha = WeightMatList w_list_stepped
   where w_list_stepped = zipWith (\(Layer w) w_grad -> Layer $ (w - (scale alpha w_grad))) w_list grad_list
